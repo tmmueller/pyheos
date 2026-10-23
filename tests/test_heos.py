@@ -532,6 +532,15 @@ async def test_disconnect_stops_reconnect_after_post_connect_failure(
         while failing.match_count == 0:
             await asyncio.sleep(0.01)
 
+    # Disconnect while the reconnect is waiting to retry, once the failed attempt
+    # has been torn down.
+    connection = heos._connection
+    async with asyncio.timeout(2):
+        while heos.connection_state is not ConnectionState.RECONNECTING or any(
+            task.get_name() == "Disconnect From Error"
+            for task in connection._running_tasks
+        ):
+            await asyncio.sleep(0.01)
     async with asyncio.timeout(2):
         await heos.disconnect()
     mock_device.register(
@@ -539,8 +548,8 @@ async def test_disconnect_stops_reconnect_after_post_connect_failure(
     )
     await asyncio.sleep(1)
 
-    assert heos.connection_state == ConnectionState.DISCONNECTED
-    assert not connect_signal.is_set()
+    assert heos.connection_state == ConnectionState.DISCONNECTED  # type: ignore[comparison-overlap]
+    assert not connect_signal.is_set()  # type: ignore[unreachable]
     assert not heos._connection._running_tasks
 
 
